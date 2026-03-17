@@ -155,5 +155,6 @@ Free license.
 Built for developers analyzing codebases at scale.
 
 ---
-*Last Updated: October 2024*
+z.Kamali! 🚀
+*Last Updated: Mar 2026*
 
