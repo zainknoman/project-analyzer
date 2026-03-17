@@ -148,7 +148,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📄 License
 
-MIT License — see [LICENSE](LICENSE) (create if needed).
+Free license.
 
 ## 🙏 Acknowledgments
 

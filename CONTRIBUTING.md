@@ -73,8 +73,8 @@ cd ../backend && uvicorn main:app --port 8000
 
 ## 📄 License
 
-MIT — by contributing, you agree code can be MIT-licensed.
+Free license.
 
 ---
-Happy Hacking! 🚀
+z.Kamali! 🚀
 
