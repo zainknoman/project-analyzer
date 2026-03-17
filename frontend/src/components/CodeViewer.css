@@ -1,0 +1,128 @@
+.code-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.cv-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.cv-filename {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text1);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cv-meta {
+  color: var(--text3);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.cv-meta::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+.cv-code-wrap {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.cv-gutter {
+  padding: 0 12px;
+  color: var(--text3);
+  text-align: right;
+  user-select: none;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  min-width: 48px;
+  background: var(--bg2);
+}
+
+.cv-lineno {
+  line-height: 1.7;
+  font-size: 11px;
+}
+
+.cv-code {
+  flex: 1;
+  padding: 0 16px;
+  min-width: 0;
+}
+
+.cv-line {
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.cv-line:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cv-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text3);
+}
+
+.cv-welcome-icon {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  color: var(--text3);
+}
+
+.cv-welcome-title {
+  font-size: 18px;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+.cv-welcome-sub {
+  font-size: 13px;
+  color: var(--text3);
+  max-width: 300px;
+  text-align: center;
+}
+
+.cv-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.cv-msg { color: var(--text2); font-size: 13px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Syntax highlight classes */
+.hl-kw  { color: #ff7b72; }
+.hl-str { color: #a5d6ff; }
+.hl-num { color: #79c0ff; }
+.hl-cm  { color: #8b949e; font-style: italic; }
+.hl-fn  { color: #d2a8ff; }
+.hl-tag { color: #7ee787; }
+.hl-attr { color: #79c0ff; }
+.hl-key { color: #d2a8ff; }
