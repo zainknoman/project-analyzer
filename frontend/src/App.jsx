@@ -3,18 +3,17 @@ import FileTree from './components/FileTree'
 import CodeViewer from './components/CodeViewer'
 import SearchPanel from './components/SearchPanel'
 import ActionPanel from './components/ActionPanel'
-import { api } from './utils/api'
+import {
+  DEFAULT_IGNORE, walkDirectory, buildTreeItems, buildStats,
+  detectFrameworks, readLocalFile
+} from './utils/localProject'
 import './App.css'
 
-const DEFAULT_IGNORE = [
-  'node_modules', '.git', 'dist', 'build', '__pycache__',
-  '.env', '*.log', '*.tmp', '*.pyc', '.DS_Store', 'venv', '.venv'
-]
-
 export default function App() {
-  const [projectPath, setProjectPath] = useState('')
-  const [inputPath, setInputPath] = useState('')
+  const [rootHandle, setRootHandle] = useState(null)
+  const [projectName, setProjectName] = useState('')
   const [files, setFiles] = useState([])
+  const [treeItems, setTreeItems] = useState([])
   const [stats, setStats] = useState(null)
   const [frameworks, setFrameworks] = useState([])
   const [activeFile, setActiveFile] = useState(null)
@@ -26,27 +25,50 @@ export default function App() {
   const [ignorePatterns, setIgnorePatterns] = useState(DEFAULT_IGNORE)
   const [showIgnoreEditor, setShowIgnoreEditor] = useState(false)
   const [ignoreText, setIgnoreText] = useState(DEFAULT_IGNORE.join('\n'))
+  const [includeSensitive, setIncludeSensitive] = useState(false)
   const [treeSearch, setTreeSearch] = useState('')
   const [openTabs, setOpenTabs] = useState([])
 
-  const handleScan = async () => {
-    const path = inputPath.trim()
-    if (!path) return
-    setScanning(true)
-    setScanError('')
-    setFiles([])
-    setStats(null)
-    setActiveFile(null)
-    setFileData(null)
-    setOpenTabs([])
+  const openFolder = async () => {
+    if (!window.showDirectoryPicker) {
+      setScanError('Folder access is not supported by this browser. Use a Chromium-based browser such as Chrome or Edge.')
+      return
+    }
+
     try {
-      const { data } = await api.scan(path, ignorePatterns)
-      setProjectPath(path)
-      setFiles(data.files)
-      setStats(data.stats)
-      setFrameworks(data.frameworks)
+      setScanning(true)
+      setScanError('')
+      const handle = await window.showDirectoryPicker({ mode: 'read' })
+      const result = await walkDirectory(handle, { ignorePatterns, includeSensitive })
+      setRootHandle(handle)
+      setProjectName(handle.name)
+      setFiles(result.files)
+      setTreeItems(buildTreeItems(result.files, result.folders, handle.name))
+      setStats(buildStats(result.files, result.folders))
+      setFrameworks(detectFrameworks(result.files))
+      setActiveFile(null)
+      setFileData(null)
+      setOpenTabs([])
+      setActiveTab('preview')
     } catch (e) {
-      setScanError(e.response?.data?.detail || 'Scan failed. Check the path and try again.')
+      if (e?.name !== 'AbortError') setScanError(e.message || 'Unable to open folder.')
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  const handleRescan = async () => {
+    if (!rootHandle) return openFolder()
+    try {
+      setScanning(true)
+      setScanError('')
+      const result = await walkDirectory(rootHandle, { ignorePatterns, includeSensitive })
+      setFiles(result.files)
+      setTreeItems(buildTreeItems(result.files, result.folders, projectName))
+      setStats(buildStats(result.files, result.folders))
+      setFrameworks(detectFrameworks(result.files))
+    } catch (e) {
+      setScanError(e.message || 'Unable to rescan folder.')
     } finally {
       setScanning(false)
     }
@@ -56,36 +78,54 @@ export default function App() {
     if (item.type !== 'file') return
     setActiveFile(item)
     setActiveTab('preview')
-    setOpenTabs(prev => {
-      if (prev.find(t => t.path === item.path)) return prev
-      return [...prev.slice(-7), item]
-    })
+    setOpenTabs(prev => prev.find(t => t.path === item.path) ? prev : [...prev.slice(-7), item])
     setFileLoading(true)
     setFileData(null)
+
     try {
-      const { data } = await api.getFile(item.path, projectPath)
-      setFileData(data)
+      const content = await readLocalFile(item)
+      setFileData({
+        name: item.name,
+        path: item.path,
+        content,
+        language: item.language,
+        lines: content.split(/\\r?\\n/).length,
+        size_str: item.size_str,
+        encoding: 'UTF-8'
+      })
     } catch (e) {
-      setFileData({ name: item.name, content: '// Error loading file: ' + (e.response?.data?.detail || e.message), language: 'Text', lines: 1, size_str: '0B', encoding: 'UTF-8' })
+      setFileData({
+        name: item.name,
+        path: item.path,
+        content: '// Error loading file: ' + e.message,
+        language: 'Text',
+        lines: 1,
+        size_str: '0B',
+        encoding: 'UTF-8'
+      })
     } finally {
       setFileLoading(false)
     }
-  }, [projectPath])
+  }, [])
 
-  const handleTabClick = (tab) => { setActiveFile(tab); handleFileSelect(tab) }
+  const handleTabClick = tab => handleFileSelect(tab)
 
   const closeTab = (e, path) => {
     e.stopPropagation()
     setOpenTabs(prev => prev.filter(t => t.path !== path))
-    if (activeFile?.path === path) { setActiveFile(null); setFileData(null) }
+    if (activeFile?.path === path) {
+      setActiveFile(null)
+      setFileData(null)
+    }
   }
 
-  const handleIgnoreSave = () => {
-    setIgnorePatterns(ignoreText.split('\n').map(l => l.trim()).filter(Boolean))
+  const handleIgnoreSave = async () => {
+    setIgnorePatterns(ignoreText.split('\\n').map(l => l.trim()).filter(Boolean))
     setShowIgnoreEditor(false)
+    if (rootHandle) await handleRescan()
   }
 
-  const projectName = projectPath ? projectPath.split(/[/\\]/).filter(Boolean).pop() : null
+  const loaded = Boolean(rootHandle)
 
   return (
     <div className="app-shell">
@@ -94,14 +134,16 @@ export default function App() {
           <span className="dot dot-r" /><span className="dot dot-y" /><span className="dot dot-g" />
         </div>
         <span className="tb-appname">PROJECT ANALYZER</span>
+
         <div className="tb-path-wrap">
-          <input className="tb-path-input" value={inputPath} onChange={e => setInputPath(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleScan()} placeholder="/path/to/your/project" spellCheck={false} />
-          <button className="btn primary tb-scan-btn" onClick={handleScan} disabled={scanning}>
-            {scanning ? '⏳ Scanning...' : '⚡ Scan'}
+          <span className="tb-local-badge">LOCAL ONLY</span>
+          <button className="btn primary tb-scan-btn" onClick={openFolder} disabled={scanning}>
+            {scanning ? '⏳ Scanning...' : loaded ? '📂 Open Folder' : '📂 Open Folder'}
           </button>
           <button className="btn tb-ignore-btn" onClick={() => setShowIgnoreEditor(v => !v)} title="Edit ignore patterns">🚫</button>
         </div>
-        {projectName && (
+
+        {loaded && (
           <div className="tb-project-name">
             <span>📁</span> {projectName}
             {stats && <span className="tb-count"> · {stats.total_files} files</span>}
@@ -122,6 +164,15 @@ export default function App() {
         </div>
       )}
 
+      <div className="local-toolbar">
+        <label className="sensitive-toggle">
+          <input type="checkbox" checked={includeSensitive} onChange={e => setIncludeSensitive(e.target.checked)} />
+          Include sensitive files
+        </label>
+        {loaded && <button className="btn" onClick={handleRescan} disabled={scanning}>↻ Rescan</button>}
+        <span className="local-note">Your folder stays in this browser tab. No project path is uploaded.</span>
+      </div>
+
       {scanError && <div className="scan-error">⚠ {scanError}</div>}
 
       <div className="main-layout">
@@ -133,18 +184,18 @@ export default function App() {
           <div className="tree-search-wrap">
             <input className="tree-search" value={treeSearch} onChange={e => setTreeSearch(e.target.value)} placeholder="Filter files..." />
           </div>
-          <FileTree files={files} activeFile={activeFile} onSelect={handleFileSelect} searchQuery={treeSearch} />
+          <FileTree files={treeItems} activeFile={activeFile} onSelect={handleFileSelect} searchQuery={treeSearch} />
         </div>
 
         <div className="center-panel">
           <div className="tab-bar">
-            <div className={`tab ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>
+            <div className={\`tab \${activeTab === 'preview' ? 'active' : ''}\`} onClick={() => setActiveTab('preview')}>
               <span className="tab-dot" />{fileData ? fileData.name : 'Preview'}
             </div>
-            <div className={`tab ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>🔍 Search</div>
+            <div className={\`tab \${activeTab === 'search' ? 'active' : ''}\`} onClick={() => setActiveTab('search')}>🔍 Search</div>
             <div className="open-tabs-scroll">
               {openTabs.map(tab => (
-                <div key={tab.path} className={`open-tab ${activeFile?.path === tab.path ? 'active' : ''}`} onClick={() => handleTabClick(tab)}>
+                <div key={tab.path} className={\`open-tab \${activeFile?.path === tab.path ? 'active' : ''}\`} onClick={() => handleTabClick(tab)}>
                   {tab.name}
                   <span className="close-tab" onClick={(e) => closeTab(e, tab.path)}>✕</span>
                 </div>
@@ -153,18 +204,26 @@ export default function App() {
           </div>
           <div className="center-content">
             {activeTab === 'preview' && <CodeViewer fileData={fileData} loading={fileLoading} />}
-            {activeTab === 'search' && <SearchPanel projectPath={projectPath} ignorePatterns={ignorePatterns} onFileOpen={handleFileSelect} />}
+            {activeTab === 'search' && (
+              <SearchPanel files={files} onFileOpen={handleFileSelect} />
+            )}
           </div>
         </div>
 
         <div className="right-panel">
           <div className="panel-header">Actions</div>
-          <ActionPanel projectPath={projectPath} stats={stats} frameworks={frameworks} ignorePatterns={ignorePatterns} />
+          <ActionPanel
+            projectName={projectName}
+            files={files}
+            stats={stats}
+            frameworks={frameworks}
+            ignorePatterns={ignorePatterns}
+          />
         </div>
       </div>
 
       <div className="statusbar">
-        <span className="sb-item"><span className={`sb-dot ${projectPath ? 'green' : 'gray'}`} />{projectPath ? 'Ready' : 'No project'}</span>
+        <span className="sb-item"><span className={\`sb-dot \${loaded ? 'green' : 'gray'}\`} />{loaded ? 'Local ready' : 'No project'}</span>
         <span className="sb-sep">|</span>
         <span className="sb-item">{fileData?.name || 'No file'}</span>
         <span className="sb-sep">|</span>
@@ -174,7 +233,7 @@ export default function App() {
         <span className="sb-sep">|</span>
         <span className="sb-item">{fileData?.encoding || 'UTF-8'}</span>
         <div style={{flex:1}} />
-        <span className="sb-item">Project Analyzer v1.0</span>
+        <span className="sb-item">Project Analyzer v1.1 · Local</span>
       </div>
     </div>
   )
