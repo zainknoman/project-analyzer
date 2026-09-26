@@ -189,13 +189,13 @@ export default function App() {
 
         <div className="center-panel">
           <div className="tab-bar">
-            <div className={\`tab \${activeTab === 'preview' ? 'active' : ''}\`} onClick={() => setActiveTab('preview')}>
+            <div className={`tab ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>
               <span className="tab-dot" />{fileData ? fileData.name : 'Preview'}
             </div>
-            <div className={\`tab \${activeTab === 'search' ? 'active' : ''}\`} onClick={() => setActiveTab('search')}>🔍 Search</div>
+            <div className={`tab ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>🔍 Search</div>
             <div className="open-tabs-scroll">
               {openTabs.map(tab => (
-                <div key={tab.path} className={\`open-tab \${activeFile?.path === tab.path ? 'active' : ''}\`} onClick={() => handleTabClick(tab)}>
+                <div key={tab.path} className={`open-tab ${activeFile?.path === tab.path ? 'active' : ''}`} onClick={() => handleTabClick(tab)}>
                   {tab.name}
                   <span className="close-tab" onClick={(e) => closeTab(e, tab.path)}>✕</span>
                 </div>
@@ -223,7 +223,7 @@ export default function App() {
       </div>
 
       <div className="statusbar">
-        <span className="sb-item"><span className={\`sb-dot \${loaded ? 'green' : 'gray'}\`} />{loaded ? 'Local ready' : 'No project'}</span>
+        <span className="sb-item"><span className={`sb-dot ${loaded ? 'green' : 'gray'}`} />{loaded ? 'Local ready' : 'No project'}</span>
         <span className="sb-sep">|</span>
         <span className="sb-item">{fileData?.name || 'No file'}</span>
         <span className="sb-sep">|</span>
